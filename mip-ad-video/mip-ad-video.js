@@ -17,8 +17,14 @@ define(function (require) {
         // this.element 可取到当前实例对应的 dom 元素
         var $element = $(this.element);
         var adSrc = $element.attr('ad-src');
+        var adSrcEnd = $element.attr('ad-src-end');
         var targetSrc = $element.attr('target-src');
         var poster = $element.attr('poster');
+
+        // 广告提示的dom
+        var domAdTip = document.createElement('div');
+        domAdTip.innerHTML = '广告';
+        domAdTip.className = 'ad-tip';
 
         //  初始化播放器
         var video = document.createElement('video');
@@ -45,14 +51,22 @@ define(function (require) {
         //  如果有广告并且非IOS上的QQ浏览器 则播放广告
         if (adSrc && !(platform.isIos() && platform.isQQ())) {
             video.src = adSrc;
+            $element[0].appendChild(domAdTip);
 
-            //  广告播放完毕
+            //  第一个视频播放完毕
             video.onended = function () {
-                video.src = targetSrc;
+                if (video.src === targetSrc && adSrcEnd) {
+                    // 显示广告提示
+                    domAdTip.style.display = 'block';
+                    video.src = adSrcEnd;
+                } else {
+                    // 隐藏广告提示
+                    domAdTip.style.display = 'none';
+                    video.src = targetSrc;
+                }
                 video.autoplay = true;
                 video.setAttribute('autoplay', 'autoplay');
 
-                // video.load();
                 video.play();
             };
         } else {  //  否则直接播放内容

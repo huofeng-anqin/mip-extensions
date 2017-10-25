@@ -1,19 +1,21 @@
 /**
  * @file 百度统计插件
  *
- * @author menglingjun
+ * @author menglingjun, Jenny_L, dongshihao
  * From: mip-stats-baidu
  */
 
 define(function (require) {
     var $ = require('zepto');
+    var viewer = require('viewer');
+    var util = require('util');
 
     var customElement = require('customElement').create();
 
     customElement.prototype.createdCallback = function () {
         var elem = this.element;
-        var token = elem.getAttribute('token');
-        var setConfig = elem.getAttribute('setconfig');
+        var config = this.getConfig();
+        var token = config.token;
 
         /**
          * 检测token是否存在
@@ -25,24 +27,77 @@ define(function (require) {
                 token
             ]);
 
-            /**
-             * 检测setconfig是否存在
-             */
-            if (setConfig) {
-                var setCustom = buildArry(decodeURIComponent(setConfig));
-                _hmt.push(setCustom);
+            // XXX: 解决来自百度搜索，内外域名不一致问题
+            if (viewer.isIframed) {
+                bdSearchCase();
             }
-
+            if (config && Array.isArray(config.conf) && config.conf.length) {
+                var conf = config.conf;
+                for (var i = 0; i < conf.length; i++) {
+                    _hmt.push(conf[i]);
+                }
+            }
             var hm = document.createElement('script');
-            hm.src = '//hm.baidu.com/hm.js?' + token;
+            hm.src = 'https://hm.baidu.com/hm.js?' + token;
             $(elem).append(hm);
             hm.onload = function () {
                 bindEle();
             };
+        } else {
+            console.warn('token is unavailable'); // eslint-disable-line
         }
 
     };
 
+    /**
+     * get config from script has type="application/json"
+     *
+     * @return {Object} config  return stats config
+     */
+    customElement.prototype.getConfig = function () {
+        var config = {};
+        var setconfig = this.element.getAttribute('setconfig');
+        try {
+            var script = this.element.querySelector('script[type="application/json"]');
+            if (script) {
+                var textContent = JSON.parse(script.textContent);
+                if (JSON.stringify(textContent) !== '{}') {
+                    config.token = textContent.token;
+                    util.fn.del(textContent, 'token');
+                    config.conf = this.objToArray(textContent);
+                }
+                return config;
+            }
+        }
+        catch (e) {
+            console.warn('json is illegal'); // eslint-disable-line
+            console.warn(e); // eslint-disable-line
+        }
+        return {
+            'token': this.element.getAttribute('token'),
+            'conf': setconfig ? new Array(buildArry(decodeURIComponent(setconfig))) : null
+        };
+    };
+
+    /**
+     * JSON object to Array
+     *
+     * @param {Object} configObj configObj from script has type="application/json"
+     * @return {Object} outConfigArray return stats array
+     */
+    customElement.prototype.objToArray = function (configObj) {
+        var outConfigArray = [];
+        if (!configObj) {
+            return;
+        }
+        for (var key in configObj) {
+            if (configObj.hasOwnProperty(key) && Array.isArray(configObj[key])) {
+                configObj[key].unshift(key);
+                outConfigArray.push(configObj[key]);
+            }
+        }
+        return outConfigArray;
+    };
 
     // 绑定事件追踪
     function bindEle() {
@@ -60,7 +115,13 @@ define(function (require) {
                 return;
             }
 
-            statusData = JSON.parse(decodeURIComponent(statusData));
+            try {
+                statusData = JSON.parse(decodeURIComponent(statusData));
+            }
+            catch (e) {
+                console.warn('事件追踪data-stats-baidu-obj数据不正确');
+                return;
+            }
 
             var eventtype = statusData.type;
 
@@ -88,12 +149,19 @@ define(function (require) {
                 _hmt.push(data);
             }
             else {
-                tagBox[index].addEventListener(eventtype, function (event) {
-                    var tempData = event.target.getAttribute('data-stats-baidu-obj');
+                tagBox[index].addEventListener(eventtype, function(event) {
+                    var tempData = this.getAttribute('data-stats-baidu-obj');
                     if (!tempData) {
                         return;
                     }
-                    var statusJson = JSON.parse(decodeURIComponent(tempData));
+                    var statusJson;
+                    try {
+                        statusJson = JSON.parse(decodeURIComponent(tempData));
+                    }
+                    catch (e) {
+                        console.warn('事件追踪data-stats-baidu-obj数据不正确');
+                        return;
+                    }
                     if (!statusJson.data) {
                         return;
                     }
@@ -124,5 +192,68 @@ define(function (require) {
         return newArray;
     }
 
+    /**
+     * 解决来自百度搜索，内外域名不一致问题
+     */
+    function bdSearchCase() {
+        var referrer = '';
+
+        var bdUrl = document.referrer;
+        var hashWord = MIP.hash.get('word') || '';
+        var hashEqid = MIP.hash.get('eqid') || '';
+        var from = MIP.hash.get('from') || '';
+        if ((hashWord || hashEqid) && bdUrl) {
+            var hashObj = {};
+            if (hashEqid && isMatch(from, 'result')) {
+                hashObj.url = '';
+                hashObj.eqid = hashEqid;
+            }
+            else {
+                hashObj.word = hashWord;
+            }
+            referrer = makeReferrer(bdUrl, hashObj);
+            _hmt.push(['_setReferrerOverride', referrer]);
+        }
+
+    }
+
+    /**
+     * to determine whether from the targetFrom
+     *
+     * @param  {string} from  referrer from mipService
+     * @param  {string} targetFrom  the target that `from` need to match.
+     * @return {boolean}     return whether from the results page
+     */
+    function isMatch(from, targetFrom) {
+        if (from && targetFrom && from === targetFrom) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * 生成百度统计_setReferrerOverride对应的referrer
+     *
+     * @param  {string} url       需要被添加参数的 url
+     * @param  {Object} hashObj   参数对象
+     * @return {string}           拼装后的 url
+     */
+    function makeReferrer(url, hashObj) {
+        var referrer = '';
+        var conjMark = url.indexOf('?') < 0 ? '?' : '&';
+        var urlData = '';
+        for (var key in hashObj) {
+            urlData += '&' + key + '=' + hashObj[key];
+        }
+        urlData = urlData.slice(1);
+        if (url.indexOf('#') < 0) {
+            referrer = url + conjMark + urlData;
+        }
+        else {
+            referrer = url.replace('#', conjMark + urlData + '#');
+        }
+        return referrer;
+    }
     return customElement;
 });

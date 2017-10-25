@@ -58,7 +58,7 @@ define(function (require) {
     function addTags(tagsHtml, firstSystem, firstId, firstName, systemName) {
         tagsHtml = '<div class=\'g-tags-box\'><ul>' + tagsHtml + '</ul></div>';
         $('.g-tags-box').remove();
-        $('.m-down-msg').after(tagsHtml);
+        $('.g-game-msg').after(tagsHtml);
         $('.g-tags-box').show();
         if (pageInfo.system.indexOf(systemName) === -1) {
             $('.m-down-msg .info .pic ul li b').each(function () {
@@ -67,7 +67,6 @@ define(function (require) {
                     $(this).text('系统：' + firstSystem);
                 }
             });
-            $('.m-down-msg h1').text(firstName);
             var urlArray = ['cr173.com', 'qqtn.com', 'fxxz.com', '5577.com', 'uzzf.com', 'skycn.com', '962.net'];
             var windowUrl = window.location.href;
             var i = 0;

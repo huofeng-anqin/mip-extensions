@@ -1,5 +1,5 @@
 ﻿/**
- * @file 360doc 自定 义逻辑组件
+ * @file 360doc 自定义逻辑组件
  * @author www.360doc.com技术部
  */
 define(function (require) {
@@ -8,7 +8,7 @@ define(function (require) {
     // build 方法，元素插入到文档时执行，仅会执行一次
     customElem.prototype.build = function () {
         if ($('.mip-360doc-script-wxggalink') !== null) {
-            $('.mip-360doc-script-wxggalink').html('<span class=\'mip-360doc-script-pic\'><img src=\'https://pubimage.360doc.com/transfer/images/zhaishou.png\' class=\'pic2\'/></span><span class=\'mip-360doc-script-pic\'><img src=\'https://pubimage.360doc.com/transfer/images/xiazai.png\'  class=\'pic2\'/></span>');
+            $('.mip-360doc-script-wxggalink').html('<span class=\'mip-360doc-script-pic\'><img src=\'https://pubimage.360doc.com/transfer/images/zhaishou2.png\' class=\'pic2\'/></span><span class=\'mip-360doc-script-pic\'><img src=\'https://pubimage.360doc.com/transfer/images/xiazai2.png\'  class=\'pic2\'/></span>');
             var picn = $('.mip-360doc-script-pic').length;
             if (picn > 1) {
                 $('.mip-360doc-script-pic').eq(0).css('display', 'inline').siblings('.mip-360doc-script-pic').hide();
@@ -60,17 +60,39 @@ define(function (require) {
             });
         }
         getBlockArt();
+        if ($('.mip-360doc-script-keyword') !== null) {
+            parseSearchWord();
+        }
     };
     function check() {
-        try {
-            if (document.documentElement.outerHTML.indexOf('iframeu2825450_0') < 0) {
-                sendlog('mipads/u2825450');
-            }
-            if (document.documentElement.outerHTML.indexOf('iframeu2825719_0') < 0) {
-                sendlog('mipads/u2825719');
+        var deny1 = true;
+        var deny2 = true;
+        var node;
+        if ($('.like_content') && $('.like_content').eq(0)) {
+            node = document.getElementsByClassName('like_content')[0];
+            if (node.getElementsByTagName('iframe') && node.getElementsByTagName('iframe')[0]
+            && node.getElementsByTagName('iframe')[0].src
+            && (node.getElementsByTagName('iframe')[0].src.indexOf('baidu.com') > 0
+                || node.getElementsByTagName('iframe')[0].src.indexOf('360doc.cn') > 0)) {
+                deny1 = false;
             }
         }
-        catch (e) { }
+
+        if ($('.like_content') && $('.like_content').eq(1)) {
+            node = document.getElementsByClassName('like_content')[1];
+            if (node.getElementsByTagName('iframe') && node.getElementsByTagName('iframe')[0]
+            && node.getElementsByTagName('iframe')[0].src
+            && (node.getElementsByTagName('iframe')[0].src.indexOf('baidu.com') > 0
+                || node.getElementsByTagName('iframe')[0].src.indexOf('360doc.cn') > 0)) {
+                deny2 = false;
+            }
+        }
+        if (deny1) {
+            sendlog('mipads/iframe_likecontent');
+        }
+        if (deny2) {
+            sendlog('mipads/iframe_service');
+        }
     }
     function record() {
         try {
@@ -133,7 +155,7 @@ define(function (require) {
             error: function () { }
         });
     }
-    //  不显示已被删除的文章.
+    //  不显示已被删除的文章
     function getBlockArt() {
         var fetchJsonp = require('fetch-jsonp');
         fetchJsonp('https://blockart.360doc.com/ajax/getstatusmip.ashx?aid=' + getID(), {
@@ -152,5 +174,30 @@ define(function (require) {
         var artid = $('.mip-360doc-script-saveid').html();
         return artid;
     }
-    return customElem;
+    //  获取搜索词
+    function parseSearchWord() {
+        try {
+            var url = '';
+            var keyword = '';
+            var index = -1;
+            var index2 = -1;
+            if (document.referrer) {
+                url = document.referrer;
+            }
+            if (url.length > 0 && url.indexOf('//m.baidu.com') >= 0) {
+                index = url.indexOf('word=');
+                if (index > 0) {
+                    index2 = url.indexOf('&', index);
+                }
+                if (index2 > 0) {
+                    keyword = url.substring(index + 5, index2);
+                    if (keyword.length > 0) {
+                        $('.mip-360doc-script-keyword').val(decodeURI(keyword));
+                    }
+                }
+            }
+        }
+        catch (e) { }
+    }
+    return customElem; 
 });

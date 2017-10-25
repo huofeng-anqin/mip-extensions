@@ -23,19 +23,18 @@ define(function (require) {
                 token
             ]);
 
-
             // 检测setconfig是否存在
             if (setConfig) {
                 var setCustom = buildArry(decodeURIComponent(setConfig));
                 _czc.push(setCustom);
             }
 
-            var html = [
-                '<script type="text/javascript">',
-                'var cnzz_protocol = (("https:" == document.location.protocol) ? " https://" : " http://");document.write(unescape("%3Cspan id=\'cnzz_stat_icon_' + token + '\'%3E%3C/span%3E%3Cscript src=\'" + cnzz_protocol + "s11.cnzz.com/z_stat.php%3Fid%3D' + token + '\' type=\'text/javascript\'%3E%3C/script%3E"));',
-                '</script>'
-            ];
-            $element.append(html.join(''));
+            var cnzzScript = document.createElement('script');
+            var src = 'https://s11.cnzz.com/z_stat.php?id=' + token
+                        + '&web_id=' + token;
+            cnzzScript.setAttribute('language', 'JavaScript');
+            cnzzScript.src = src; 
+            $element.append($(cnzzScript));
             bindEle();
         }
 
@@ -54,8 +53,13 @@ define(function (require) {
                 return;
             }
 
-            statusData = JSON.parse(decodeURIComponent(statusData));
-
+            try {
+                statusData = JSON.parse(decodeURIComponent(statusData));
+            } catch (e) {
+                console.warn("事件追踪data-stats-cnzz-obj数据不正确");
+                return;
+            }
+            
             var eventtype = statusData.type;
             if (!statusData.data) {
                 return;
@@ -79,11 +83,17 @@ define(function (require) {
             }
             else {
                 tagBox[index].addEventListener(eventtype, function (event) {
-                    var tempData = event.target.getAttribute('data-stats-cnzz-obj');
+                    var tempData = this.getAttribute('data-stats-cnzz-obj');
                     if (!tempData) {
                         return;
                     }
-                    var statusJson = JSON.parse(decodeURIComponent(tempData));
+                    var statusJson;
+                    try {
+                        statusJson = JSON.parse(decodeURIComponent(tempData));
+                    } catch (e) {
+                        console.warn("事件追踪data-stats-cnzz-obj数据不正确");
+                        return;
+                    }
                     if (!statusJson.data) {
                         return;
                     }
